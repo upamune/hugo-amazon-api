@@ -1,0 +1,3 @@
+package: github.com/upamune/hugo-amazon-api
+import:
+- package: github.com/dominicphillips/amazing

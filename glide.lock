@@ -1,0 +1,6 @@
+hash: cb723b5284b681a305d49da8085e75e347eb5eb0fc591611fb717bc4a72fd92e
+updated: 2017-07-22T22:24:45.083062524+09:00
+imports:
+- name: github.com/dominicphillips/amazing
+  version: cb987417d19c613c4c104e1f8bf47bf8d5bfe0c5
+testImports: []

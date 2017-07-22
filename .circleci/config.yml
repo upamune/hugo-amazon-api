@@ -1,0 +1,14 @@
+version: 2
+jobs:
+  build:
+    working_directory: /go/src/github.com/upamune/hugo-amazon-api
+    docker:
+      - image: instrumentisto/glide:0.12.3-go1.8
+    steps:
+      - checkout
+      - run:
+          name: install deps
+          command: glide install
+      - run:
+          name: build
+          command: go build
