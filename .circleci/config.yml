@@ -15,5 +15,7 @@ jobs:
       - run:
           name: deploy
           command: |
-            gox -ldflags "-w -s" -output "dist/ncd_{{.OS}}_{{.Arch}}"
-            ghr -t $GITHUB_TOKEN -u upamune -r hugo-amazon-api --replace $(git describe --tags) dist/
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              gox -ldflags "-w -s" -os "linux" -os "windows" -os "darwin" -output "dist/ncd_{{.OS}}_{{.Arch}}"
+              ghr -t $GITHUB_TOKEN -u upamune -r hugo-amazon-api --replace $(git describe --tags) dist/
+            fi
