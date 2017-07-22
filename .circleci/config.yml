@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/upamune/hugo-amazon-api
     docker:
-      - image: instrumentisto/glide:0.12.3-go1.8
+      - image: upamune/hugo-amazon-api-ci
     steps:
       - checkout
       - run:
@@ -12,3 +12,8 @@ jobs:
       - run:
           name: build
           command: go build
+      - run:
+          name: deploy
+          command: |
+            gox -ldflags "-w -s" -output "dist/ncd_{{.OS}}_{{.Arch}}"
+            ghr -t $GITHUB_TOKEN -u upamune -r hugo-amazon-api --replace $(git describe --tags) dist/
