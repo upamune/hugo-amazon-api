@@ -5,17 +5,22 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 
 	"github.com/upamune/amazing"
 )
 
-var client *amazing.Amazing
+type service struct {
+	client   *amazing.Amazing
+	cacheDir string
+}
 
 func main() {
-	var port string
+	var port, cacheDir string
 	var awsAccess, awsSecret, awsTag, awsDomain string
 
 	flag.StringVar(&awsAccess, "access", "", "aws access id")
@@ -23,18 +28,22 @@ func main() {
 	flag.StringVar(&awsTag, "tag", "", "amazon tag")
 	flag.StringVar(&awsDomain, "domain", "JP", "amazon domain")
 	flag.StringVar(&port, "port", "8080", "port number")
+	flag.StringVar(&cacheDir, "cache-dir", "", "for json cache")
 	flag.Parse()
 
-	var err error
-	client, err = amazing.NewAmazing(awsDomain, awsTag, awsAccess, awsSecret)
+	client, err := amazing.NewAmazing(awsDomain, awsTag, awsAccess, awsSecret)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	service := &service{
+		client:   client,
+		cacheDir: cacheDir,
+	}
 	http.HandleFunc("/hc", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	http.HandleFunc("/", amazonHandler)
+	http.HandleFunc("/", service.amazonHandler)
 	log.Printf("Starting Server at %s\n", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
@@ -57,7 +66,33 @@ type Item struct {
 	LargeImage  string
 }
 
-func amazonHandler(w http.ResponseWriter, req *http.Request) {
+var ErrNotFoundFile = errors.New("file not found")
+
+func (s *service) getItemFromCache(itemID string) ([]byte, error) {
+	filename := s.getFileName(itemID)
+
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, ErrNotFoundFile
+	}
+
+	return b, nil
+}
+
+func (s *service) getFileName(itemID string) string {
+	return fmt.Sprintf("%s/%s", s.cacheDir, itemID)
+}
+
+func (s *service) saveItemToCache(item *Item) error {
+	f, err := os.OpenFile(s.getFileName(item.ASIN), os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return json.NewEncoder(f).Encode(item)
+}
+
+func (s *service) amazonHandler(w http.ResponseWriter, req *http.Request) {
 	if err := req.ParseForm(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf("invalid form: %v", err)))
@@ -70,13 +105,30 @@ func amazonHandler(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(fmt.Sprintf("invalid item id: %s", itemID)))
 		return
 	}
+
+	// キャッシュされていたらキャッシュを返す
+	if s.cacheDir != "" {
+		json, err := s.getItemFromCache(itemID)
+		if err != nil {
+			if err != ErrNotFoundFile {
+				log.Printf("failed get a cache: %s", err)
+			}
+		} else {
+			// キャッシュが見つかった時
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(json)
+			log.Printf("hit cache: %s", itemID)
+			return
+		}
+	}
+
 	params := url.Values{
 		"IdType":        []string{"ASIN"},
 		"ItemId":        []string{itemID},
 		"Operation":     []string{"ItemLookup"},
 		"ResponseGroup": []string{"Large"},
 	}
-	res, err := client.ItemLookup(params)
+	res, err := s.client.ItemLookup(params)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(fmt.Sprintf("failed to get item infomation: %v", err)))
@@ -96,6 +148,13 @@ func amazonHandler(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(fmt.Sprintf("failed to marshal item to json: %v", err)))
 		return
+	}
+
+	// キャッシュする
+	if s.cacheDir != "" {
+		if err := s.saveItemToCache(item); err != nil {
+			log.Printf("failed to save a cache: %v", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
