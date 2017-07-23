@@ -31,6 +31,9 @@ func main() {
 		log.Fatal(err)
 	}
 
+	http.HandleFunc("/hc", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 	http.HandleFunc("/", amazonHandler)
 	log.Printf("Starting Server at %s\n", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
