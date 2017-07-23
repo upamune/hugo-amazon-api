@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/dominicphillips/amazing"
+	"github.com/upamune/amazing"
 )
 
 var client *amazing.Amazing
@@ -26,7 +26,7 @@ func main() {
 	flag.Parse()
 
 	var err error
-	client, err = amazing.NewAmazing("JP", awsTag, awsAccess, awsSecret)
+	client, err = amazing.NewAmazing(awsDomain, awsTag, awsAccess, awsSecret)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,10 +42,16 @@ func main() {
 }
 
 type Item struct {
-	ASIN        string
-	Title       string
-	Brand       string
-	URL         string
+	ASIN         string
+	Brand        string
+	Creator      string
+	Manufacturer string
+	Publisher    string
+	ReleaseDate  string
+	Studio       string
+	Title        string
+	URL          string
+
 	SmallImage  string
 	MediumImage string
 	LargeImage  string
@@ -68,7 +74,7 @@ func amazonHandler(w http.ResponseWriter, req *http.Request) {
 		"IdType":        []string{"ASIN"},
 		"ItemId":        []string{itemID},
 		"Operation":     []string{"ItemLookup"},
-		"ResponseGroup": []string{"Medium"},
+		"ResponseGroup": []string{"Large"},
 	}
 	res, err := client.ItemLookup(params)
 	if err != nil {
@@ -105,13 +111,18 @@ func resToItem(res *amazing.AmazonItemLookupResponse) (*Item, error) {
 	aitem := items[0]
 
 	item := &Item{
-		ASIN:        aitem.ASIN,
-		Title:       aitem.ItemAttributes.Title,
-		Brand:       aitem.ItemAttributes.Brand,
-		URL:         aitem.DetailPageURL,
-		SmallImage:  aitem.SmallImage.URL,
-		MediumImage: aitem.MediumImage.URL,
-		LargeImage:  aitem.LargeImage.URL,
+		ASIN:         aitem.ASIN,
+		Brand:        aitem.ItemAttributes.Brand,
+		Creator:      aitem.ItemAttributes.Creator,
+		Manufacturer: aitem.ItemAttributes.Manufacturer,
+		Publisher:    aitem.ItemAttributes.Publisher,
+		ReleaseDate:  aitem.ItemAttributes.ReleaseDate,
+		Studio:       aitem.ItemAttributes.Studio,
+		Title:        aitem.ItemAttributes.Title,
+		URL:          aitem.DetailPageURL,
+		SmallImage:   aitem.SmallImage.URL,
+		MediumImage:  aitem.MediumImage.URL,
+		LargeImage:   aitem.LargeImage.URL,
 	}
 
 	return item, nil
